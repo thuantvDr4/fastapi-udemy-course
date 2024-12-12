@@ -6,9 +6,10 @@ Configuration, Python Request Object
 use Pydantics
 '''
 
-from fastapi import FastAPI, Path
+from fastapi import FastAPI, Path, Query, HTTPException
 from pydantic import BaseModel, Field
 from models import BookRequest
+from starlette import status
 
 app = FastAPI()
 
@@ -51,12 +52,12 @@ BOOKS = [
 
 
 
-@app.get("/books")
+@app.get("/books", status_code=status.HTTP_200_OK)
 async def read_all_books():
     return BOOKS
 
 
-@app.post("/books/create_book")
+@app.post("/books/create_book", status_code=status.HTTP_201_CREATED)
 async def create_new_book(book_request: BookRequest):
     new_book = Book(**book_request.model_dump())
     BOOKS.append(find_book_id(new_book))
@@ -73,16 +74,16 @@ def find_book_id(book: Book):
     return book
 
 
-@app.get('/books/{book_id}')
+@app.get('/books/{book_id}', status_code=status.HTTP_200_OK)
 async def read_book_by_id(book_id: int = Path(gt=0)):
     for book in BOOKS:
         if book.id == book_id:
             return book
-    return {"message": "book not found"}
+    # return {"message": "book not found"}
+    raise HTTPException(status_code=404, detail= "item not found" )
 
-
-@app.get('/books/')
-async def read_book_by_rating(rating: int):
+@app.get('/books/', status_code=status.HTTP_200_OK)
+async def read_book_by_rating(rating: int = Query(gt=0, lt=6)):
     books_to_return = []
     for book in BOOKS:
         if book.rating == rating:
@@ -90,14 +91,18 @@ async def read_book_by_rating(rating: int):
     return books_to_return
 
 
-@app.put('/books/update_book')
+@app.put('/books/update_book', status_code=status.HTTP_204_NO_CONTENT)
 async def update_book(book: BookRequest):
+    book_changed = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book.id:
             BOOKS[i] = book
+            book_changed = True
+    if not book_changed:
+        raise HTTPException(status_code=404, detail='Item not found')
 
 
-@app.delete('/books/{book_id}')
+@app.delete('/books/{book_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book(book_id: int):
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book_id:
